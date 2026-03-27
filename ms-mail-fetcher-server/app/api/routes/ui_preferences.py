@@ -50,6 +50,22 @@ def get_ui_preferences():
 @router.put("/preferences", response_model=UiPreferences)
 def update_ui_preferences(payload: UiPreferencesUpdate):
     current = _read_preferences()
-    merged = UiPreferences(sidebar_collapsed=payload.sidebar_collapsed if payload.sidebar_collapsed is not None else current.sidebar_collapsed)
+    merged = UiPreferences(
+        sidebar_collapsed=(
+            payload.sidebar_collapsed
+            if payload.sidebar_collapsed is not None
+            else current.sidebar_collapsed
+        ),
+        window_width=(
+            payload.window_width
+            if payload.window_width is not None
+            else current.window_width
+        ),
+        window_height=(
+            payload.window_height
+            if payload.window_height is not None
+            else current.window_height
+        ),
+    )
     _write_preferences(merged)
     return merged

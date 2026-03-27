@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { Refresh } from '@element-plus/icons-vue'
 import { getMailDetail, getMailList } from '@/api/accounts'
 
 const route = useRoute()
@@ -73,11 +74,37 @@ async function onViewDetail(row) {
 }
 
 function goBack() {
+    const fromPath = String(route.query._from || '')
+
+    if (fromPath === '/active' || fromPath === '/archived') {
+        const query = {
+            page: String(route.query._page || 1),
+            page_size: String(route.query._page_size || 10),
+        }
+
+        const search = String(route.query._search || '')
+        if (search) query.search = search
+
+        const type = String(route.query._type || '')
+        if (fromPath === '/active' && type) query.type = type
+
+        router.push({
+            path: fromPath,
+            query,
+        })
+        return
+    }
+
     if (window.history.length > 1) {
         router.back()
-    } else {
-        router.push('/active')
+        return
     }
+
+    router.push('/active')
+}
+
+async function onRefreshMails() {
+    await fetchMails()
 }
 
 watch(
@@ -97,7 +124,10 @@ onMounted(fetchMails)
         <template #header>
             <div class="header-row">
                 <div class="title">正在查看: {{ email }} - {{ folderText }}</div>
-                <el-button @click="goBack">返回上一页</el-button>
+                <div class="header-actions">
+                    <el-button :icon="Refresh" :loading="loading" @click="onRefreshMails">刷新列表</el-button>
+                    <el-button @click="goBack">返回上一页</el-button>
+                </div>
             </div>
         </template>
 
@@ -154,6 +184,12 @@ onMounted(fetchMails)
 .title {
     font-size: 16px;
     font-weight: 600;
+}
+
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
 
 .pager {

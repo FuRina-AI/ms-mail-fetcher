@@ -1,18 +1,19 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { CopyDocument, Refresh } from '@element-plus/icons-vue'
 import { deleteAccount, exportAccountsUrl, getAccounts, refreshAllAccountTokens } from '@/api/accounts'
 
 const router = useRouter()
+const route = useRoute()
 
 const loading = ref(false)
 const refreshAllLoading = ref(false)
 const rows = ref([])
 const total = ref(0)
 const page = ref(1)
-const pageSize = ref(20)
+const pageSize = ref(10)
 const search = ref('')
 const selectedRows = ref([])
 
@@ -54,22 +55,59 @@ async function fetchData() {
     }
 }
 
+function toPositiveInt(value, fallback) {
+    const n = Number.parseInt(String(value ?? ''), 10)
+    return Number.isFinite(n) && n > 0 ? n : fallback
+}
+
+function applyStateFromRouteQuery() {
+    page.value = toPositiveInt(route.query.page, 1)
+    pageSize.value = toPositiveInt(route.query.page_size, 10)
+    search.value = String(route.query.search || '')
+}
+
+function syncRouteQuery() {
+    const query = {
+        page: String(page.value),
+        page_size: String(pageSize.value),
+    }
+    if (search.value) query.search = search.value
+
+    router.replace({
+        path: '/archived',
+        query,
+    })
+}
+
 function onSearch() {
     page.value = 1
+    syncRouteQuery()
     fetchData()
 }
 
 function resetFilters() {
     search.value = ''
     page.value = 1
+    syncRouteQuery()
     fetchData()
 }
 
 function goMail(row, folder) {
     router.push({
         path: `/mail/${row.id}/${folder}`,
-        query: { email: row.email },
+        query: {
+            email: row.email,
+            _from: '/archived',
+            _page: String(page.value),
+            _page_size: String(pageSize.value),
+            _search: search.value,
+        },
     })
+}
+
+function onPageChange() {
+    syncRouteQuery()
+    fetchData()
 }
 
 function onExportAll() {
@@ -162,7 +200,10 @@ async function onBatchDeleteSelected() {
     }
 }
 
-onMounted(fetchData)
+onMounted(() => {
+    applyStateFromRouteQuery()
+    fetchData()
+})
 </script>
 
 <template>
@@ -243,7 +284,7 @@ onMounted(fetchData)
             <div class="pager">
                 <el-pagination v-model:current-page="page" v-model:page-size="pageSize"
                     layout="total, sizes, prev, pager, next, jumper" :total="total" :page-count="pageCount"
-                    :page-sizes="[10, 20, 50, 100]" @change="fetchData" />
+                    :page-sizes="[10, 20, 50, 100]" @change="onPageChange" />
             </div>
         </el-card>
     </div>

@@ -106,7 +106,11 @@ class MailDetailResponse(BaseModel):
 
 class UiPreferences(BaseModel):
     sidebar_collapsed: bool = False
+    window_width: int = Field(default=1280, ge=1100)
+    window_height: int = Field(default=860, ge=760)
 
 
 class UiPreferencesUpdate(BaseModel):
-    sidebar_collapsed: bool
+    sidebar_collapsed: bool | None = None
+    window_width: int | None = Field(default=None, ge=1100)
+    window_height: int | None = Field(default=None, ge=760)

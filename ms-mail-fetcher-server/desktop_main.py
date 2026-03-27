@@ -26,6 +26,10 @@ DEFAULT_DESKTOP_HOST = "127.0.0.1"
 DEFAULT_WAIT_SECONDS = 20
 WINDOW_TITLE = "MS Mail Fetcher"
 SINGLE_INSTANCE_MUTEX_NAME = "Local\\MS_MAIL_FETCHER_DESKTOP_SINGLE_INSTANCE"
+MIN_WINDOW_WIDTH = 1100
+MIN_WINDOW_HEIGHT = 760
+DEFAULT_WINDOW_WIDTH = 1280
+DEFAULT_WINDOW_HEIGHT = 860
 
 
 class _SingleInstanceGuard:
@@ -101,6 +105,93 @@ def _prepare_webview_storage() -> Path:
     return base
 
 
+def _sanitize_window_size(width: object, height: object) -> tuple[int, int]:
+    try:
+        width_val = int(width)
+    except (TypeError, ValueError):
+        width_val = DEFAULT_WINDOW_WIDTH
+
+    try:
+        height_val = int(height)
+    except (TypeError, ValueError):
+        height_val = DEFAULT_WINDOW_HEIGHT
+
+    return max(MIN_WINDOW_WIDTH, width_val), max(MIN_WINDOW_HEIGHT, height_val)
+
+
+def _load_window_size(api_url: str) -> tuple[int, int]:
+    try:
+        response = requests.get(f"{api_url}/api/ui/preferences", timeout=1.5)
+        if not response.ok:
+            return DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT
+
+        data = response.json() if response.content else {}
+        if not isinstance(data, dict):
+            return DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT
+
+        return _sanitize_window_size(data.get("window_width"), data.get("window_height"))
+    except Exception:
+        return DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT
+
+
+def _save_window_size(api_url: str, width: object, height: object) -> None:
+    safe_width, safe_height = _sanitize_window_size(width, height)
+    try:
+        requests.put(
+            f"{api_url}/api/ui/preferences",
+            json={
+                "window_width": safe_width,
+                "window_height": safe_height,
+            },
+            timeout=1.5,
+        )
+    except Exception:
+        logger.debug("Failed to persist desktop window size.", exc_info=True)
+
+
+def _bind_window_size_persistence(
+    window,
+    api_url: str,
+    initial_width: int,
+    initial_height: int,
+) -> None:
+    events = getattr(window, "events", None)
+    if events is None:
+        return
+
+    latest = {
+        "width": initial_width,
+        "height": initial_height,
+    }
+
+    def _capture_size_from_args(*args):
+        if len(args) < 2:
+            return
+        width, height = _sanitize_window_size(args[0], args[1])
+        latest["width"] = width
+        latest["height"] = height
+
+    def _persist_from_latest():
+        width = latest.get("width")
+        height = latest.get("height")
+        _save_window_size(api_url, width, height)
+
+    def _on_resized(*args):
+        _capture_size_from_args(*args)
+
+    def _on_closing(*args):
+        _capture_size_from_args(*args)
+        _persist_from_latest()
+
+    if hasattr(events, "resized"):
+        events.resized += _on_resized
+
+    if hasattr(events, "closing"):
+        events.closing += _on_closing
+    elif hasattr(events, "closed"):
+        events.closed += _on_closing
+
+
 def main() -> None:
     guard = _SingleInstanceGuard(SINGLE_INSTANCE_MUTEX_NAME)
     if not guard.acquire():
@@ -108,6 +199,7 @@ def main() -> None:
         return
     server = None
     server_thread = None
+    main_window = None
     try:
         host, port = _resolve_desktop_bind()
         api_url = f"http://{host}:{port}"
@@ -137,21 +229,26 @@ def main() -> None:
         _wait_until_ready(api_url)
         logger.info("Desktop UI opening: %s", api_url)
 
+        initial_width, initial_height = _load_window_size(api_url)
+
         create_window_params = inspect.signature(webview.create_window).parameters
         window_kwargs = {
             "title": WINDOW_TITLE,
             "url": api_url,
-            "min_size": (1100, 760),
-            "width": 1280,
-            "height": 860,
+            "min_size": (MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT),
+            "width": initial_width,
+            "height": initial_height,
         }
 
         if "private_mode" in create_window_params:
             window_kwargs["private_mode"] = False
         if "storage_path" in create_window_params:
             window_kwargs["storage_path"] = str(storage_path)
+        if "text_select" in create_window_params:
+            window_kwargs["text_select"] = True
 
-        webview.create_window(**window_kwargs)
+        main_window = webview.create_window(**window_kwargs)
+        _bind_window_size_persistence(main_window, api_url, initial_width, initial_height)
         webview.start()
     finally:
         if server is not None:
