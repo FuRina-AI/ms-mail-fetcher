@@ -10,6 +10,7 @@ from urllib.parse import quote
 CONFIG_FILE_NAME = "server.config.json"
 COOKIE_NAME = "msmf_session"
 COOKIE_MAX_AGE = 60 * 60 * 24 * 30
+DEFAULT_AUTH_TOKEN = "admin"
 
 
 def _resolve_config_path() -> Path:
@@ -25,17 +26,17 @@ def load_auth_token() -> str:
 
     config_path = _resolve_config_path()
     if not config_path.exists():
-        return ""
+        return DEFAULT_AUTH_TOKEN
 
     try:
         with config_path.open("r", encoding="utf-8") as f:
             data = json.load(f)
         if isinstance(data, dict):
-            return str(data.get("auth_token") or data.get("access_token") or "")
+            return str(data.get("auth_token") or data.get("access_token") or DEFAULT_AUTH_TOKEN)
     except Exception:
-        return ""
+        return DEFAULT_AUTH_TOKEN
 
-    return ""
+    return DEFAULT_AUTH_TOKEN
 
 
 def auth_enabled() -> bool:

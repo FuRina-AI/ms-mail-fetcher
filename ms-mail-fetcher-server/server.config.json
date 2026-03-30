@@ -3,5 +3,6 @@
   "port": 18765,
   "reload": false,
   "auto_port_fallback": true,
-  "port_retry_count": 20
+  "port_retry_count": 20,
+  "auth_token": "admin"
 }

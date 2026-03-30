@@ -161,10 +161,13 @@ build_desktop.bat
 
 ### 6.1 Token 登录保护（适合服务器外网访问）
 
-项目支持通过环境变量或配置文件开启一个简洁的 token 登录门：
+项目支持通过环境变量或配置文件开启一个简洁的 token 登录门。
+
+- **默认 token：`admin`**
+- 生产环境推荐通过环境变量覆盖，不要把真实 token 提交进仓库
 
 ```bash
-# 推荐：环境变量
+# 推荐：环境变量（会覆盖默认 admin）
 export MSMF_AUTH_TOKEN='your-secret-token'
 python app.py
 ```
@@ -175,7 +178,7 @@ python app.py
 {
   "host": "0.0.0.0",
   "port": 18765,
-  "auth_token": "your-secret-token"
+  "auth_token": "admin"
 }
 ```
 
