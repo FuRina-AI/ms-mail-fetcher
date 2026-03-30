@@ -90,3 +90,9 @@ export function updateUiPreferences(payload) {
     body: JSON.stringify(payload),
   })
 }
+
+export function logout() {
+  return request('/api/auth/logout', {
+    method: 'POST',
+  })
+}

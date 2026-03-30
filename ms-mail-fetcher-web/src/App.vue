@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Fold, Expand, User, Box } from '@element-plus/icons-vue'
-import { getAccounts, getUiPreferences, updateUiPreferences } from '@/api/accounts'
+import { getAccounts, getUiPreferences, logout, updateUiPreferences } from '@/api/accounts'
 
 const SIDEBAR_COLLAPSE_STORAGE_KEY = 'ms_mail_fetcher_sidebar_collapsed'
 
@@ -78,6 +78,15 @@ function onAccountsChanged() {
   fetchOverviewCounts()
 }
 
+async function handleLogout() {
+  try {
+    await logout()
+  } catch {
+    // ignore logout failure and continue redirect
+  }
+  window.location.replace('/login')
+}
+
 onMounted(async () => {
   await loadSidebarCollapsedState()
   preferenceLoaded.value = true
@@ -145,6 +154,7 @@ onBeforeUnmount(() => {
               >总计: <strong>{{ totalCount }}</strong></span
             >
           </div>
+          <button class="logout-btn" @click="handleLogout">退出登录</button>
         </div>
       </el-header>
       <el-main class="main">
@@ -233,6 +243,22 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.logout-btn {
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+  border-radius: 12px;
+  padding: 8px 14px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.logout-btn:hover {
+  border-color: #94a3b8;
+  background: #f8fafc;
 }
 
 .overview-pill {

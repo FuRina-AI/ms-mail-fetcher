@@ -5,6 +5,7 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
 const http = axios.create({
   baseURL: API_BASE_URL,
   timeout: 15000,
+  withCredentials: true,
 })
 
 http.interceptors.response.use(
@@ -17,6 +18,11 @@ http.interceptors.response.use(
 
     const { status, data } = response
     let message = `请求失败: ${status}`
+
+    if (status === 401 && typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+      const next = `${window.location.pathname}${window.location.search}${window.location.hash}`
+      window.location.replace(`/login?next=${encodeURIComponent(next || '/')}`)
+    }
 
     if (typeof data === 'string' && data.trim()) {
       message = data

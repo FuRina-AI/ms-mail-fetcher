@@ -11,15 +11,17 @@ from fastapi import FastAPI
 from fastapi import HTTPException
 from fastapi import Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 
 from app.api.routes.account_types import router as account_types_router
 from app.api.routes.accounts import router as accounts_router
+from app.api.routes.auth import router as auth_router
 from app.api.routes.health import router as health_router
 from app.api.routes.mail import router as mail_router
 from app.api.routes.ui_preferences import router as ui_preferences_router
 from app.crud.account_types import ensure_default_account_types
 from app.db.database import Base, SessionLocal, engine
+from app.security import COOKIE_NAME, auth_enabled, build_login_page, build_login_redirect, is_valid_session_cookie
 
 
 logger = logging.getLogger("ms_mail_fetcher")
@@ -177,6 +179,38 @@ def create_app() -> FastAPI:
     )
 
     @app.middleware("http")
+    async def auth_gate(request: Request, call_next):
+        if not auth_enabled():
+            return await call_next(request)
+
+        path = request.url.path or "/"
+        if request.method == "OPTIONS":
+            return await call_next(request)
+
+        excluded_paths = {
+            "/login",
+            "/api/auth/login",
+            "/api/auth/logout",
+            "/api/auth/status",
+            "/api/health",
+            "/favicon.ico",
+        }
+        if path in excluded_paths:
+            return await call_next(request)
+
+        session_cookie = request.cookies.get(COOKIE_NAME)
+        if is_valid_session_cookie(session_cookie):
+            return await call_next(request)
+
+        if path.startswith("/api/"):
+            return JSONResponse(status_code=401, content={"detail": "未登录或登录已失效"})
+
+        next_path = request.url.path
+        if request.url.query:
+            next_path = f"{next_path}?{request.url.query}"
+        return RedirectResponse(url=build_login_redirect(next_path), status_code=302)
+
+    @app.middleware("http")
     async def log_requests(request: Request, call_next):
         start = time.perf_counter()
         response = await call_next(request)
@@ -187,11 +221,16 @@ def create_app() -> FastAPI:
         )
         return response
 
+    app.include_router(auth_router)
     app.include_router(accounts_router)
     app.include_router(account_types_router)
     app.include_router(mail_router)
     app.include_router(health_router)
     app.include_router(ui_preferences_router)
+
+    @app.get("/login", include_in_schema=False)
+    async def token_login_page(next: str = "/"):
+        return HTMLResponse(build_login_page(next_path=next))
 
     frontend_dist = resolve_frontend_dist()
     if frontend_dist:

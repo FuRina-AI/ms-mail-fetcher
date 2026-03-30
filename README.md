@@ -159,6 +159,44 @@ build_desktop.bat
 - `auto_port_fallback`：端口被占用时自动递增尝试
 - `port_retry_count`：尝试端口数量
 
+### 6.1 Token 登录保护（适合服务器外网访问）
+
+项目支持通过环境变量或配置文件开启一个简洁的 token 登录门：
+
+```bash
+# 推荐：环境变量
+export MSMF_AUTH_TOKEN='your-secret-token'
+python app.py
+```
+
+也可以写入 `server.config.json`：
+
+```json
+{
+  "host": "0.0.0.0",
+  "port": 18765,
+  "auth_token": "your-secret-token"
+}
+```
+
+开启后行为如下：
+- 访问 `/` 时，未登录会自动跳转到 `/login`
+- 前端和 API 共用同一套 Cookie 会话
+- `GET /api/health` 保持开放，方便做探活
+- `POST /api/auth/login` 用 token 登录
+- `POST /api/auth/logout` 退出登录
+
+> 建议把 token 放环境变量，不要把真实密钥直接提交到仓库。
+
+### 6.2 Linux / 服务器部署建议
+
+如果你要部署在 Linux 服务器并从外网访问，推荐：
+
+1. 构建前端并同步到 `ms-mail-fetcher-server/template`
+2. 使用 `python app.py` 或 `systemd` 常驻运行
+3. 配置 `MSMF_AUTH_TOKEN`
+4. 再通过反向代理或公网端口暴露服务
+
 ---
 
 ## 7. 数据库与数据存储
